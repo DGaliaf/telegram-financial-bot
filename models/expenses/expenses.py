@@ -6,26 +6,20 @@ from typing import List
 import pytz
 
 import exceptions
-from categories import Categories
 from database.sqlite import SQLite
-from expenses import Expense, Message
+from models.categories import Categories
+from models.expenses.model import ExpenseModel, MessageModel
 
 
 class Expense:
     def __init__(self, db: SQLite):
-        self.db = SQLite()
+        self.db = db
 
-    def add_expense(self, raw_message: str) -> Expense:
+    def add_expense(self, raw_message: str) -> ExpenseModel:
         parsed_message = self._parse_message(raw_message)
-        category = Categories().get_category(
-            parsed_message.category_text)
-        inserted_row_id = self.db.insert("expense", {
-            "amount": parsed_message.amount,
-            "created": self._get_now_formatted(),
-            "category_codename": category.codename,
-            "raw_text": raw_message
-        })
-        return Expense(id=None,
+        category = Categories().get_category(parsed_message.category_text)
+
+        return ExpenseModel(id=None,
                        amount=parsed_message.amount,
                        category_name=category.name)
 
@@ -72,15 +66,17 @@ class Expense:
                 f"{now.day * self._get_budget_limit()} руб.")
 
 
-    def last(self) -> List[Expense]:
+    def last(self) -> List[ExpenseModel]:
         cursor = self.db.get_cursor()
         cursor.execute(
             "select e.id, e.amount, c.name "
             "from expense e left join category c "
             "on c.codename=e.category_codename "
             "order by created desc limit 10")
+
         rows = cursor.fetchall()
-        last_expenses = [Expense(id=row[0], amount=row[1], category_name=row[2]) for row in rows]
+
+        last_expenses = [ExpenseModel(id=row[0], amount=row[1], category_name=row[2]) for row in rows]
         return last_expenses
 
 
@@ -88,7 +84,7 @@ class Expense:
         self.db.delete("expense", self.row_id)
 
 
-    def _parse_message(self, raw_message: str) -> Message:
+    def _parse_message(self, raw_message: str) -> MessageModel:
         regexp_result = re.match(r"([\d ]+) (.*)", raw_message)
         if not regexp_result or not regexp_result.group(0) \
                 or not regexp_result.group(1) or not regexp_result.group(2):
@@ -98,7 +94,7 @@ class Expense:
 
         amount = regexp_result.group(1).replace(" ", "")
         category_text = regexp_result.group(2).strip().lower()
-        return Message(amount=amount, category_text=category_text)
+        return MessageModel(amount=amount, category_text=category_text)
 
 
     def _get_now_formatted(self) -> str:
@@ -114,5 +110,4 @@ class Expense:
 
 
     def _get_budget_limit(self) -> int:
-        """Возвращает дневной лимит трат для основных базовых трат"""
         return self.db.fetchall("budget", ["daily_limit"])[0]["daily_limit"]

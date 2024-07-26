@@ -1,12 +1,12 @@
 from typing import NamedTuple, Optional
 
 
-class Message(NamedTuple):
+class MessageModel(NamedTuple):
     amount: int
     category_text: str
 
 
-class Expense(NamedTuple):
+class ExpenseModel(NamedTuple):
     id: Optional[int]
     amount: int
     category_name: str
